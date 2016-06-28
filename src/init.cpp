@@ -315,6 +315,7 @@ std::string HelpMessage(HelpMessageMode mode)
     {
 #ifndef WIN32
         strUsage += HelpMessageOpt("-daemon", _("Run in the background as a daemon and accept commands"));
+        strUsage += HelpMessageOpt("-syslog", _("Log to syslog instead of stdout/stderr (whether a daemon or not)"));
 #endif
     }
     strUsage += HelpMessageOpt("-datadir=<dir>", _("Specify data directory"));

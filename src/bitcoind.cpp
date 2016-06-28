@@ -10,6 +10,7 @@
 #include "chainparams.h"
 #include "clientversion.h"
 #include "compat.h"
+#include "logmsg.h"
 #include "rpc/server.h"
 #include "init.h"
 #include "noui.h"
@@ -76,6 +77,9 @@ bool AppInit(int argc, char* argv[])
     // If Qt is used, parameters/bitcoin.conf are parsed in qt/bitcoin.cpp's main()
     ParseParameters(argc, argv);
 
+    // Initialise logging if necessary
+    loginit("bitcoind", LOG_PID | LOG_CONS, LOG_DAEMON);
+
     // Process help and version before taking care about datadir
     if (mapArgs.count("-?") || mapArgs.count("-h") ||  mapArgs.count("-help") || mapArgs.count("-version"))
     {
@@ -101,21 +105,21 @@ bool AppInit(int argc, char* argv[])
     {
         if (!boost::filesystem::is_directory(GetDataDir(false)))
         {
-            fprintf(stderr, "Error: Specified data directory \"%s\" does not exist.\n", mapArgs["-datadir"].c_str());
+            logmsg(LOG_ERR, "Error: Specified data directory \"%s\" does not exist.", mapArgs["-datadir"].c_str());
             return false;
         }
         try
         {
             ReadConfigFile(mapArgs, mapMultiArgs);
         } catch (const std::exception& e) {
-            fprintf(stderr,"Error reading configuration file: %s\n", e.what());
+            logmsg(LOG_ERR,"Error reading configuration file: %s", e.what());
             return false;
         }
         // Check for -testnet or -regtest parameter (Params() calls are only valid after this clause)
         try {
             SelectParams(ChainNameFromCommandLine());
         } catch (const std::exception& e) {
-            fprintf(stderr, "Error: %s\n", e.what());
+            logmsg(LOG_ERR, "Error: %s", e.what());
             return false;
         }
 
@@ -134,21 +138,22 @@ bool AppInit(int argc, char* argv[])
         fDaemon = GetBoolArg("-daemon", false);
         if (fDaemon)
         {
-            fprintf(stdout, "Bitcoin server starting\n");
+            logmsg(LOG_INFO, "Bitcoin server starting");
 
             // Daemonize
 #  if HAVE_DECL_DAEMON
+            fflush(NULL);
             // daemon(3) basically does exactly what follows in the else block,
             // but it's best to use library functions where they're available
             if (daemon(0, 0)) {
-                fprintf(stderr, "Error: daemon() failed: %s\n", strerror(errno));
+                logmsg(LOG_ERR, "Error: daemon() failed: %s", strerror(errno));
                 return false;
             }
 #  else
             pid_t pid = fork();
             if (pid < 0)
             {
-                fprintf(stderr, "Error: fork() failed: %s\n", strerror(errno));
+                logmsg(LOG_ERR, "Error: fork() failed: %s", strerror(errno));
                 return false;
             }
             if (pid > 0) // Parent process, pid is child process id
@@ -158,8 +163,9 @@ bool AppInit(int argc, char* argv[])
             // Child process falls through to rest of initialization
 
             pid_t sid = setsid();
-            if (sid < 0)
-                fprintf(stderr, "Error: setsid() failed: %s\n", strerror(errno));
+            if (sid < 0) {
+                logmsg(LOG_ERR, "Error: setsid() failed: %s", strerror(errno));
+            }
 
             (void)chdir("/");
 
